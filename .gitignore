@@ -2,3 +2,13 @@
 .Rhistory
 .RData
 .Ruserdata
+summer.rxproj
+for
+.suo
+.idea*
+*.pdf
+*.csv
+*.pyc
+*.png
+summerTest.Rproj
+
