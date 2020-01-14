@@ -42,6 +42,7 @@ class PostProcessing:
         self.scenario_number = scenario_number
         self.requested_times = requested_times
         self.multipliers = multipliers
+        self.derived_outputs = model.derived_outputs if hasattr(model, 'derived_outputs') else None
 
         self.operations_to_perform = {}
         self.generated_outputs = {}

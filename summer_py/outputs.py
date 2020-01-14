@@ -355,7 +355,14 @@ class Outputs:
         """
         main method to run the plotting of all the outputs requested in the post-processing object
         """
-        for requested_output in self.post_processing_list[0].requested_outputs:
+
+        outputs_to_plot = self.post_processing_list[0].requested_outputs if \
+            self.post_processing_list[0].derived_outputs is None else\
+            self.post_processing_list[0].requested_outputs + list(self.post_processing_list[0].derived_outputs.keys())
+
+        for requested_output in outputs_to_plot:
+            if requested_output == 'times':
+                continue
             if self.multiplot_only:
                 multiplot_plotting_modes = [True]
             elif len(self.scenario_names) > 1:
@@ -364,13 +371,17 @@ class Outputs:
                 multiplot_plotting_modes = [False]
 
             for multi_plot in multiplot_plotting_modes:
-                if isinstance(self.post_processing_list[0].generated_outputs[requested_output], dict) \
-                            and requested_output[0:22] == "distribution_of_strata" and multi_plot:
-                        continue
+                if requested_output not in self.post_processing_list[0].derived_outputs:
+                    if isinstance(self.post_processing_list[0].generated_outputs[requested_output], dict) \
+                                and requested_output[0:22] == "distribution_of_strata" and multi_plot:
+                            continue
 
                 y_max = - 1.e9
 
                 for scenario_index, scenario_number in enumerate(self.scenario_names.keys()):
+                    data_to_plot = self.post_processing_list[scenario_index].generated_outputs[requested_output] if\
+                        requested_output not in self.post_processing_list[scenario_index].derived_outputs else\
+                        self.post_processing_list[scenario_index].derived_outputs[requested_output]
                     if not multi_plot or scenario_index == 0:
                         fig, axes, max_dims, n_rows, n_cols = initialise_figures_axes(1)
                         axis = find_panel_grid_indices([axes], 0, n_rows, n_cols)
@@ -386,31 +397,38 @@ class Outputs:
                                              self.targets_to_plot[requested_output][1], marker='o', color='white',
                                              s=marker_size-20.)
 
-
                     times_to_plot = self.post_processing_list[scenario_index].model.times if \
                             requested_output not in self.post_processing_list[scenario_index].requested_times.keys() else \
                             self.post_processing_list[scenario_index].requested_times[requested_output]
 
-                    if isinstance(self.post_processing_list[scenario_index].generated_outputs[requested_output], list):
+                    if isinstance(data_to_plot, list):
 
                         if not multi_plot and scenario_index > 0:
                             times_to_plot_0 = self.post_processing_list[0].model.times if \
                                 requested_output not in self.post_processing_list[0].requested_times.keys() else \
                                 self.post_processing_list[0].requested_times[requested_output]
+
+                            data_to_plot_0 = self.post_processing_list[0].generated_outputs[requested_output] if\
+                                                requested_output not in self.post_processing_list[0].derived_outputs else\
+                                                self.post_processing_list[0].derived_outputs[requested_output]
+
                             axis.plot(times_to_plot_0,
-                                  self.post_processing_list[0].generated_outputs[requested_output],
+                                  data_to_plot_0,
                                   color=self.colour_theme[0],
                                   label='Baseline')
 
-                        this_label = 'Scenario ' + str(scenario_number) if scenario_number>0 else "Baseline"
+                        this_label = 'Scenario ' + str(scenario_number) if scenario_number > 0 else "Baseline"
+
+                        sc_color = self.colour_theme[scenario_number] if \
+                            scenario_number < len(self.colour_theme) else 'black'
 
                         axis.plot(times_to_plot,
-                                  self.post_processing_list[scenario_index].generated_outputs[requested_output],
-                                  color=self.colour_theme[scenario_number],
+                                  data_to_plot,
+                                  color=sc_color,
                                   label=this_label)
 
                         y_max = max([y_max,
-                                    max(self.post_processing_list[scenario_index].generated_outputs[requested_output])])
+                                    max(data_to_plot)])
                         if scenario_index == 0 or not multi_plot:
                             self.tidy_x_axis(axis, start=min(times_to_plot), end=max(times_to_plot), max_dims=max_dims,
                                              x_label='time')
@@ -418,10 +436,10 @@ class Outputs:
                         if not multi_plot or scenario_index == len(self.scenario_names) - 1:
                             self.tidy_y_axis(axis, quantity='', max_dims=max_dims, y_label=output_name, max_value=y_max)
 
-                    elif isinstance(self.post_processing_list[scenario_index].generated_outputs[requested_output], dict) \
+                    elif isinstance(data_to_plot, dict) \
                             and requested_output[0:22] == "distribution_of_strata":
 
-                        current_data = self.post_processing_list[scenario_index].generated_outputs[requested_output]
+                        current_data = data_to_plot
                         self.plot_stacked_epi_outputs(axis, times_to_plot, current_data, fraction=False)
 
                     if not multi_plot or scenario_index == len(self.scenario_names) - 1:
@@ -477,13 +495,24 @@ class Outputs:
                             requested_output not in self.post_processing_list[sc_index].requested_times.keys() else \
                             self.post_processing_list[sc_index].requested_times[requested_output]
 
+            times_to_plot_baseline = self.post_processing_list[0].model.times if \
+                            requested_output not in self.post_processing_list[sc_index].requested_times.keys() else \
+                            self.post_processing_list[0].requested_times[requested_output]
+
             for i, stratum in enumerate(all_groups[stratification]):
                 requested_output_for_stratum = requested_output + 'XamongX' + stratification + '_' + stratum
                 _label = self.translation_dict[stratification + '_' + stratum] if\
                     stratification + '_' + stratum in self.translation_dict.keys() else stratification + '_' + stratum
+
+                # plot baseline run in addition to scenario run
+                if sc_index > 0:
+                    axis.plot(times_to_plot_baseline, self.post_processing_list[0].generated_outputs[requested_output_for_stratum],
+                          color=self.colour_theme[0],label='baseline')
+
                 axis.plot(times_to_plot, self.post_processing_list[sc_index].generated_outputs[requested_output_for_stratum],
                           color=self.colour_theme[i+1],
                           label=_label)
+
 
             self.tidy_x_axis(axis, start=1990., end=max(times_to_plot), max_dims=max_dims,
                                              x_label='time')
@@ -525,11 +554,10 @@ if __name__ == "__main__":
                    'distribution_of_strataXstrain',
                    'distribution_of_strataXage'
                    ]
-    req_times = {'prevXinfectiousXamongXage_10Xstrain_sensitive': [0., 30./365]}
     multipliers = {'prevXinfectiousXamongXage_10Xstrain_sensitive': 1.e5,
                    'prevXinfectiousXamong': 1.e5}
-    pp = post_proc.PostProcessing(sir_model, req_outputs, req_times, multipliers)
-    pp2 = post_proc.PostProcessing(sir_model, req_outputs, req_times, multipliers)
+    pp = post_proc.PostProcessing(sir_model, req_outputs, multipliers=multipliers, scenario_number=0)
+    pp2 = post_proc.PostProcessing(sir_model, req_outputs, multipliers=multipliers, scenario_number=1)
 
     targets_to_plot = {'prevXinfectiousXamongXage_10Xstrain_sensitive': [[0.01, 0.05], [20000., 80000.]]}
     translation_dict = {'prevXinfectiousXamongXage_10Xstrain_sensitive': 'Prevalence of TB among 10-30 years old'}

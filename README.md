@@ -35,11 +35,25 @@ platform
 ## Code
 The code base is provided in R and Python as two open-source platforms that are among the most commonly used in
 infectious disease modelling applications.
-Python is more naturally suited to object-oriented programming, such that the R code requires the R6 package as a
-dependency through much of its structure. The code in the two languages is intended to be as equivalent as possible.
+Python is more naturally suited to object-oriented programming (OOP), such that the R code requires the R6 package as a
+dependency through much of its structure.
+The code in the two languages is intended to be as equivalent as possible.
+This document is intended to explain the SUMMER structure using language and terminology familiar to readers with a
+background in OOP and familiarity with these two languages.
+Therefore, although it has been developed with infectious disease epidemiologists in mind, it is not intended to be
+readily readable by epidemiologists without also reading some background on these subjects.
+Nevertheless, a very brief introduction to OOP follows.
 In general Python lists are implemented as R vectors and Python dictionaries are implemented as R lists.
 
 ## Object-oriented structure
+The OOP used in SUMMER is a commonly used paradigm in computer programming.
+It involves creating objects, which have attributes (collections of data) and methods (which govern the object's
+behaviour).
+Objects are instances of classes, with SUMMER defining a number of classes that we have developed.
+Therefore, a class defines the basic structure of an object and can be thought of as a template for objects.
+An important feature of OOP is inheritance.
+Inheritance allows a new class to be developed from an existing class, and to inherit its structure and features.
+
 SUMMER considers epidemiological models as objects with attributes and methods relevant to the general construction of
 epidemiological models typically used to simulate infectious disease transmission dynamics. When a model object is
 instantiated, it is created with a set of features that allow for the construction of a compartmental model in a
@@ -52,7 +66,7 @@ features provided in the StratifiedModel class allow for rapid and reliable stra
 created in EpiModel without the need for the repetitive code or the use of loops.
 
 The general approach to using the model objects is described below, but the details of how individual arguments should
-formatted, etc. is provided in the docstrings to each method of the model object(s).
+be formatted, etc. is provided in the docstrings to each method of the model object(s).
 The attributes of the classes are described in single docstrings at the start of these class definitions.
 
 # Workflow of model creation
@@ -67,6 +81,7 @@ implemented in ODEs. The object constructor must be provided with arguments that
 4. Model parameters for the calculation of flows
 5. Inter-compartmental flows
 6. A range of optional arguments pertaining to modelling and reporting features
+
 The first five arguments are required, but inter-compartmental flows can be provided as an empty list and populated
 with specific flows later.
 Note also that not all compartments must have an initial value provided at the construction stage, as default
@@ -84,8 +99,9 @@ Therefore, typical compartment names might include "susceptible", "infectious", 
 
 ### Initial conditions
 The process of setting the initial values of the model runs as follows:
-1. All compartments requested in construction are set to values of zero, so that compartments that are not requested in
-the initial conditions constructor argument will retain a value of zero, even if not specifically requested
+1. All compartments requested in construction are set to values of zero by default.
+Alternative initial values should be requested for specific compartments in the initial conditions, but if no request is
+made, each compartment will start with a value of zero.
 2. Each requested compartment in the keys/names of the initial conditions request are looped through and checked to
 ensure that they are available compartments. If they are, the value is set to the request.
 3. If the user has requested to sum initial conditions to a total value, the remainder of the total population that has
@@ -100,7 +116,7 @@ Inter-compartmental or death flows are requested as a dict/list. The keys/names 
 compartment_death or customised_flows
 * parameter: provides the parameter name that the model should use to calculate the transition rate during integration
 * origin: the name of the compartment from which the flow arises
-* to: the name of the compartment that the transition goes towards, no applicable to death flows
+* to: the name of the compartment that the transition goes towards, not applicable to death flows
 standard_flows will calculate the flow rate as the parameter value by the size of the origin compartment.
 
 infection_density flows will calculate the flow rate as the parameter value multiplied by the size of the infectious
@@ -110,7 +126,9 @@ infection_frequency flows will calculate the flow rate as the parameter value mu
 population divided by the total population size multiplied by the size of the origin compartment.
 
 customised_flows use a user-defined function to define a rate of transition, which may not necessarily be multiplied by
-the size of the origin compartment, such that the negative compartment values could result. This will result in a 
+the size of the origin compartment, such that negative compartment values could result. We consider this a more advanced
+feature that would typically be used by experienced programmers when developing more complicated models and is not a
+necessary feature of most standard compartmental models.
 
 ### Model running
 Model running is called through the run_model method to the model object once constructed
@@ -120,11 +138,12 @@ Both integration functions are available from the scipy.integrate module.
 
 ### Infectious compartment(s)
 Differing from earlier releases, this is now specified as a list of all the compartment types that are infectious, in
-order to allow for multiple infectious compartment types. For example, patients may be infectious when active
-undiagnosed, as well as after diagnosis. This can be requested by specifying the infectious_compartments with multiple
-list elements (e.g. ["infectious", "detected"] in Python). The default argument to infectious_compartment is
-["infectious"], so the model will not run if no alternative argument is submitted and "infectious" is not included in
-the compartment types requested. 
+order to allow for multiple infectious compartment types.
+For example, patients may be infectious when active undiagnosed, as well as after diagnosis.
+This can be requested by specifying the infectious_compartments with multiple list elements
+(e.g. infectious_compartment=["infectious", "detected"] as the Python argument in construction).
+The default argument to infectious_compartment is ["infectious"] (so the model will not run if no alternative argument
+is submitted and "infectious" is not included in the compartment types requested).
 
 ### Tracking outputs
 For outputs such as incidence and total mortality, a dictionary/list can be passed (output_connections) to request
@@ -144,19 +163,26 @@ are submitted as dictionaries with keys to name the quantities and values to def
 There are currently three options for calculating the rate of birth implemented in SUMMER (although further approaches
 may be introduced in the future).
 The currently implemented options are:
-* no_birth: No births/recruitment is implemented
+* no_birth: No births/recruitment is implemented.
+This will result in a declining population over time if either infection-related deaths or population-wide mortality
+are also implemented.
 * add_crude_birth_rate: The parameter "crude_birth_rate" is multiplied by the total population size to determine the
-birth/recruitment rate
+birth/recruitment rate.
+This will result in the population increasing over time if the birth rate is higher than all death rates (including
+infection-related deaths and population-wide mortality).
 * replace_deaths: Under this approach the total rate of all deaths to be tracked throughout model integration (which is
-implemented automatically if this approach is requested) and these deaths re-enter the model as births
+implemented automatically if this approach is requested) and these deaths re-enter the model as births.
+This will result in a stable population over time, or a "closed" model in epidemiological terms.
 Whichever approach is adopted, births then accrue to the compartment nominated by the user as the entry_compartment,
 which is assumed to be "susceptible" by default.
 
 ### Death rates
 In addition to the disease/infection-specific death rates that are implemented individually as mentioned above, users
 may request a universal, population-wide death rate to be added to all compartments.
-This can be achieved by specifying the parameter "universal_death_rate" in the parameters submitted to the model.
-If this parameter name is not provided, it will be taken to be zero.
+This can be achieved by specifying the parameter "universal_death_rate" in the parameters submitted to the model, which
+may be specified as a constant or time-variant parameter.
+If this parameter name is not provided, it will be taken to be zero by default.
+The universal death rate can also be altered for population groups (eg. age groups) in stratified versions of the model.
 
 ### Outputs
 Once integration has completed, the class will have an attribute called outputs to represent the compartment sizes
@@ -167,22 +193,27 @@ However, simple functions have been provided to calculate the total size of seve
 stratified and to plot the total value of this group of compartments. 
 
 ## Stratification
-If a stratified model is required, this can be built through the class StratifiedModel, which provides additional
-methods for automatically stratifying the original model built using the parent (EpiModel) class's methods only
-(although the object should be created as an instance of StratifiedModel throughout to ensure all methods are
-available).
+If a stratified model is required, this can be built through the class StratifiedModel.
+This provides additional methods for automatically stratifying the original model built using the parent (EpiModel)
+class's methods only (although the model object should be created as an instance of StratifiedModel throughout to ensure
+all methods are available).
 Stratification could also be achieved manually by specifying compartments and flows through loops, etc. and using the
-EpiModel class only, but using this stratification approach is a major part of the reason for the development of SUMMER.
+EpiModel class only.
+However, this would require longer and more complicated code, with the associated potential for errors.
+Enabling a simpler and faster approach to stratification was a major part of the reason for the development of SUMMER.
 
 Model stratification is requested through the stratify method to StratifiedModel, which is the master method that calls
 all other processes that need to be applied to the base model structure to construct the stratified mode.
 After construction, the model is then run using the run_model method as it would be for the unstratified EpiModel
-version, with some additional methods run in preparation for integration at this stage (which do not need to be run at
-every stratification step).
+version, with some additional methods run in preparation for integration at this stage.
+These methods do not need to be run at every integration step and include processes such as determining which
+compartment indices fall within which strata, pre-assigning dictionary structures to calculate forces of infection for
+multiple strains and for multiple population groups under heterogeneous mixing, etc.
 
 Get more information on the process of stratification as it proceeds by requesting verbose to be True when calling the
 stratify method.
-(Note that this argument differs from the verbose argument to the model construction process). 
+(Note that this argument differs from the verbose argument to the model construction process, such that verbose can be
+turned on for model construction but off for stratification, or vice versa). 
 
 ### Stratification naming
 The name of the stratification to be applied to the model is requested as the first argument to the stratify method.
@@ -210,7 +241,8 @@ Accordingly, for the case of age, the compartments for stratification must be pr
 be raised.
 
 ### Age stratification
-As noted above, the stratification name should be "age" when this behaviour is required.
+As noted above, the stratification name should be "age" when age stratification is desired, as several features have
+been built in to the stratification process when this stratification name is used.
 
 The names of the strata levels within this stratification must be submitted as numeric values (integer or float).
 These values represent "age breakpoints", such that the age classes are separated at each of these points.
@@ -221,27 +253,29 @@ Requests submitted un-ordered will be sorted for implementation.
 For example, if the user submits the values 15 and 5 in this (or any) order, the model will be stratified into the age
 ranges: 0 to 4, 5 to 14 and 15+, with these three stratum names referred to as 0, 5 and 15 in the model code.
 
-Ageing flows are implemented automatically for every age stratum except for the oldest one. The rate of the flow is
-equal to the inverse of the width of the age range. For example, the rate of transition from the 0 to 4 bracket to the
-5 to 14 bracket in the example above would be 0.2.
+Ageing flows (that is transitions from one age category to the next, older age category) are implemented automatically
+for every age stratum except for the oldest one.
+The rate of the flow is equal to the inverse of the width of the age range.
+For example, the rate of transition from the 0 to 4 bracket to the 5 to 14 bracket in the example above would be 0.2.
 
 ### Starting proportions for initial conditions
 The population assigned to each compartment under the user request for initial conditions (as described above) must be
 split between the strata of the stratification being requested - if the stratification applies to that compartment.
 This can be set through the user request, using a dictionary/list with keys being the strata names and values being the
 proportion of the population to be assigned to each stratum.
-The value provided for each stratum must be one of the strata names and the total of the values assigned must be less
-than or equal to one.
+The starting value provided for each stratum must be associated with a key representing one of the strata names, and the
+total of the values assigned must be less than or equal to one.
+
 For any stratum not provided in this argument, an equal proportion of the unallocated starting population will be
 assigned to that stratum (i.e. the reciprocal of the number of unassigned strata).
 For example, if the strata are "positive" and "negative" and the user requests 0.6 for "positive", 0.4 will be assigned
-to "negative". If the strata are "a", "b" and "c" and the user requests 0.4 for "a", then "0.3" will be assigned to "b"
-and "c".
+to "negative".
+If the strata are "a", "b" and "c" and the user requests 0.4 for "a", then "0.3" will be assigned to "b" and "c".
 
 ### Entry flows
-The proportion of new births (or "entries/recruitment") may also be specified by the user, which is done through a
-separate argument to that for initial conditions (unlike earlier releases).
-Note that this consideration only applies if the entry compartment is stratified.
+The distribution of new births (or "entries/recruitment") into strata may also be specified by the user, which is done
+through a separate argument to that for initial conditions (earlier SUMMER releases differ in this behaviour).
+This consideration only applies if the entry compartment is stratified.
 The proportion of births assigned to each stratum can be submitted as a constant or time-variant parameter, as for
 parameters pertaining to other model processes, such as inter-compartmental transitions.
 
@@ -283,6 +317,7 @@ If this is the case, the lower parameter is modified by the function specified i
 function being a simple multiplication if the parameter was submitted as a float.
 If no value was specified, the parameter remains unadjusted and if an overwrite parameter was specified the process
 stops at that point in the branching process with the parameter specified at that point of stratification.
+
 If a string is provided rather than a numeric/float value, this will be interpreted as representing a function, that
 will then be looked for as the key to the parameter_function attribute of the model.
 Therefore, a function must be provided before integration as the corresponding value to the parameter_function
@@ -299,18 +334,19 @@ dimensions equal to n x m, where n is the number of strata in the first heteroge
 number of strata in the second heterogeneous mixing stratification.
 In this case, the composite mixing matrix is calculated as the kronecker product of the two mixing matrices for the two
 stratifications.
-The contents of the matrices may not strictly be contact rates, because the the rates of contact would still be
+The contents of the matrices may not strictly be per capita contact rates, because the rates of contact are still
 calculated by multiplying through by the parameter associated with that transition (although if this were set to one, 
-then they would be). 
+then this would be the case).
 
 ### Heterogeneous infectiousness
 Heterogeneous infectiousness of different strata can be specified through the infectiousness_adjustments argument to the
 stratify method.
-These are specified as a dictionary of relative infectiousness values with keys strata and values the relative
+These are specified as a dictionary of relative infectiousness values with keys the strata names and values the relative
 infectiousness of that strata.
 
 ### Multi-strain models
 Multi-strain models can be created by specifying "strain" as the stratification name when calling stratify.
+As with "age", using this stratification name will result in specific model behaviours.
 When this is done, the force of infection will be calculated separately for each stratum, representing a strain of the
 organism of interest.
 Only compartments representing infection with the organism should be included in the compartments being stratified.
@@ -320,8 +356,8 @@ Only compartments representing infection with the organism should be included in
 ## Model attributes
 These are described in detail in the docstrings to the EpiModel class and the StratifiedModel class.
 However, note that the two attributes that are stored as data frames can be easily examined.
-For example, in Python, the to_csv method to the transition and death data frames allows easy visualisation of these
-structures in Excel.
+For example, in Python, calling the to_csv method to the transition and death data frames allows easy visualisation of
+these structures in Excel.
 This has the following columns:
 * type: the type of flow being implemented, specifying the behaviour of the flow
 * parameter: the name of the parameter being used for the transition calculation
